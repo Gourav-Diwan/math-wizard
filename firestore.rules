@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ========================================
+    // USER STATS COLLECTION
+    // ========================================
+    match /users/{userId} {
+      // Anyone can read user stats (for leaderboard)
+      allow read: if true;
+      
+      // Only the user can create their own document
+      // Added: Validate data structure
+      allow create: if request.auth != null 
+                    && request.auth.uid == userId
+                    && request.resource.data.userId == userId
+                    && request.resource.data.totalPoints is int
+                    && request.resource.data.totalPoints >= 0;
+      
+      // Only the user can update their own stats
+      // Added: Prevent changing userId and ensure points don't go negative
+      allow update: if request.auth != null 
+                    && request.auth.uid == userId
+                    && request.resource.data.userId == resource.data.userId
+                    && request.resource.data.totalPoints is int
+                    && request.resource.data.totalPoints >= 0;
+      
+      // Don't allow delete (preserve user history)
+      allow delete: if false;
+    }
+    
+    // ========================================
+    // CUSTOM LEVELS COLLECTION
+    // ========================================
+    match /levels/{levelId} {
+      // Anyone can read levels (for browsing community levels)
+      allow read: if true;
+      
+      // Only authenticated users can create levels
+      // Added: Validate required fields and data types
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.title.size() <= 100
+                    && request.resource.data.story is string
+                    && request.resource.data.story.size() <= 500;
+      
+      // Only the creator can update their level
+      // Added: Prevent changing userId
+      allow update: if request.auth != null
+                    && resource.data.userId == request.auth.uid
+                    && request.resource.data.userId == resource.data.userId;
+      
+      // Only the creator can delete their level
+      allow delete: if request.auth != null
+                    && resource.data.userId == request.auth.uid;
+    }
+  }
+}
